@@ -71,7 +71,15 @@ make clean
 
 ## Configuration (`config.json`)
 
-Place `config.json` in the **same directory as the binary** (or in the current working directory when using `go run`).
+`config.json` is **optional**. If the file is not found (and no `-config` path was given), the program starts with sensible defaults:
+
+| Setting | Default |
+|---------|---------|
+| `datadir` | `./data` (relative to working directory) |
+| DB settings | DB connection skipped |
+| NSFW settings | NSFW detection disabled |
+
+Place `config.json` in the **same directory as the binary** (or in the current working directory when using `go run`) to override any of these defaults.
 
 ```json
 {
@@ -499,6 +507,29 @@ After login, X.com redirects to different paths depending on account state (2FA,
 
 ## Security Notes
 
-- `cookies.json` contains your session token. Add it to `.gitignore` and keep it private.
-- The file is saved with `0600` permissions (owner read/write only).
-- `config.json` may contain DB credentials; keep it out of version control as well.
+### Credential files
+
+- `cookies.json` contains your X.com session token (`auth_token`). **Add it to `.gitignore`** and never commit it.
+  - Saved with `0600` permissions (owner read/write only).
+- `config.json` may contain MySQL credentials. Keep it out of version control as well.
+
+### Known issues and mitigations
+
+| Severity | Location | Issue | Mitigation |
+|----------|----------|-------|------------|
+| 🔴 Medium | `processor/processor.go` | **No HTTP response size limit** — `io.Copy` reads the full response body without a cap; a malformed or oversized response could exhaust disk space | Add `io.LimitReader(resp.Body, maxSize)` |
+| 🔴 Medium | `processor/processor.go` | **No HTTP client timeout** — `http.Get` uses the default client with no timeout; a slow or hung server blocks indefinitely | Use `&http.Client{Timeout: 60*time.Second}` |
+| 🟡 Low | `processor/processor.go` | **`photoExt` extension not validated** — the `format` query param from the URL is used as-is for the file extension with no allowlist check | Restrict to `jpg`, `jpeg`, `png`, `gif`, `webp`, `mp4` |
+| 🟡 Low | `cookieswithchromedp/login.go` | **`--no-sandbox` Chrome flag** — disables browser sandboxing; increases attack surface if a malicious page loads during login | Remove if the environment supports sandboxing (test on macOS first) |
+| 🟡 Low | `pidfile/pidfile.go` | **PID file permissions `0644`** — readable by all local users; PID exposure is minimal risk but inconsistent with the `0600` used for `cookies.json` | Change to `0600` |
+| 🟢 Info | `pidfile/pidfile.go` | **TOCTOU race condition** — small window between reading and writing the PID file where a second instance could slip through | Acceptable for a personal single-user tool |
+
+### Items verified as safe
+
+| Item | Status | Reason |
+|------|--------|--------|
+| SQL injection | ✅ Safe | All queries use `?` parameterized placeholders |
+| Shell injection (ffmpeg/ffprobe) | ✅ Safe | `exec.Command` receives arguments as separate strings, not via a shell |
+| `cookies.json` file permissions | ✅ Safe | Written with `0600` in both `cookieswithchromedp` and `loadcookies` |
+| DB password in logs | ✅ Safe | DSN is logged with password replaced by `***` |
+| Path traversal via username | ✅ Safe in practice | Twitter usernames are restricted to `[A-Za-z0-9_]`; `/` and `..` are not allowed |

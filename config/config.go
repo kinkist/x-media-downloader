@@ -34,14 +34,25 @@ type Config struct {
 //  1. config.json in the same directory as the executable (binary)
 //  2. config.json in the current working directory (CWD) ← fallback for go run
 //
-// Returns an error if the file is not found.
+// config.json is optional when no explicit path is given.
+// If the file is not found, default values are used:
+//   - datadir  → "data" (set by main.go)
+//   - db*      → DB connection skipped
+//   - nsfw*    → NSFW detection disabled
+//
+// If an explicit -config path is provided but the file does not exist, an error is returned.
 func Load(path string) (*Config, error) {
-	if path == "" {
+	explicit := path != ""
+	if !explicit {
 		path = resolveConfigPath()
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if !explicit && os.IsNotExist(err) {
+			// config.json not found and no explicit path was given — use defaults
+			return &Config{}, nil
+		}
 		return nil, fmt.Errorf("failed to read config file %q: %w", path, err)
 	}
 
