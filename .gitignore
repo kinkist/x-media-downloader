@@ -30,3 +30,14 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# custom
+CLAUDE.md
+config.json*
+cookies.json*
+CLAUDE.md
+HANDOVER*
+.claude
+x-media-downloader
+x-media-downloader-*
+*.har
