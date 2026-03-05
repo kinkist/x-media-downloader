@@ -41,3 +41,4 @@ HANDOVER*
 x-media-downloader
 x-media-downloader-*
 *.har
+data/
