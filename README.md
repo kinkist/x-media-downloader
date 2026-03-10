@@ -561,7 +561,9 @@ for tweet := range scraper.GetLikes(ctx, 100) {
 | `userId` source | Extracted automatically from the `twid` cookie (`u%3D12345` → `12345`) |
 | Response struct | `likesTimelineV2` (defined in `timeline_v2.go`) |
 
-> **Note:** The Likes API uses `timeline` as the JSON key, not `timeline_v2`. A dedicated `likesTimelineV2` struct is used instead of the shared `timelineV2` to correctly map this path.
+> **Note 1:** The Likes API uses `timeline` as the JSON key, not `timeline_v2`. A dedicated `likesTimelineV2` struct is used instead of the shared `timelineV2` to correctly map this path.
+
+> **Note 2 — user schema difference:** The Likes API places `screen_name` and `name` inside `result.core` instead of `result.legacy`. Other endpoints use `result.legacy.screen_name`. `result.parse()` in `timeline_v2.go` handles this with a fallback: if `legacy.ScreenName` is empty, it reads from `Core.ScreenName`.
 
 ---
 

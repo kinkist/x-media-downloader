@@ -158,8 +158,9 @@ func ProcessTweet(tweet *twitterscraper.Tweet, dataDir string) error {
 //	file missing → download needed, return true
 func decideDownload(rawURL, dst string) bool {
 	name := filepath.Base(dst)
+	dbURL := stripQuery(rawURL) // strip ?tag=12 etc. before DB lookup
 	if db.DB != nil {
-		tracked, err := db.IsURLTracked(rawURL)
+		tracked, err := db.IsURLTracked(dbURL)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  [WARN] DB query failed (%s): %v — proceeding with download\n", name, err)
 			return true
@@ -219,8 +220,9 @@ func downloadTrackAndNSFW(rawURL, dst, tweetID, username, userID, fileType strin
 	}
 
 	// record in DB only when both download and NSFW succeeded
+	// store URL without query params so lookups are stable regardless of ?tag= value
 	if db.DB != nil && nsfwOK {
-		if err := db.MarkFileDownloaded(rawURL, dst, tweetID, username, userID, fileType, isRetweet); err != nil {
+		if err := db.MarkFileDownloaded(stripQuery(rawURL), dst, tweetID, username, userID, fileType, isRetweet); err != nil {
 			fmt.Fprintf(os.Stderr, "  [WARN] DB record failed (%s): %v\n", filepath.Base(dst), err)
 		}
 	}
@@ -297,6 +299,19 @@ func sanitizeUsername(name string) string {
 		return "_"
 	}
 	return s
+}
+
+// stripQuery removes query parameters from a URL, returning scheme://host/path only.
+// Used to normalize media URLs before DB lookup and storage — e.g.
+// "https://video.twimg.com/.../file.mp4?tag=12" → "https://video.twimg.com/.../file.mp4"
+// Falls back to the original URL if parsing fails.
+func stripQuery(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	u.RawQuery = ""
+	return u.String()
 }
 
 // photoExt extracts the file extension from a Twitter image URL.

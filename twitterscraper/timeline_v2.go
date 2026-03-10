@@ -12,6 +12,12 @@ type tweet struct {
 			Result struct {
 				IsBlueVerified bool       `json:"is_blue_verified"`
 				Legacy         legacyUser `json:"legacy"`
+				// Core is populated in newer API responses (e.g. Likes endpoint)
+				// where screen_name/name are moved out of legacy into core.
+				Core struct {
+					Name       string `json:"name"`
+					ScreenName string `json:"screen_name"`
+				} `json:"core"`
 			} `json:"result"`
 		} `json:"user_results"`
 	} `json:"core"`
@@ -82,6 +88,17 @@ func (result *result) parse() *Tweet {
 	if result.Typename == "TweetWithVisibilityResults" {
 		legacy = &result.Tweet.Legacy
 		user = &result.Tweet.Core.UserResults.Result.Legacy
+	}
+	// Fallback: newer API responses (e.g. Likes endpoint) put screen_name/name
+	// inside result.core instead of result.legacy. Fill legacy fields if empty.
+	if user.ScreenName == "" {
+		if result.Typename == "TweetWithVisibilityResults" {
+			user.ScreenName = result.Tweet.Core.UserResults.Result.Core.ScreenName
+			user.Name = result.Tweet.Core.UserResults.Result.Core.Name
+		} else {
+			user.ScreenName = result.Core.UserResults.Result.Core.ScreenName
+			user.Name = result.Core.UserResults.Result.Core.Name
+		}
 	}
 	tw := parseLegacyTweet(user, legacy)
 	if tw == nil {
