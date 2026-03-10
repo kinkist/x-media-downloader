@@ -50,6 +50,7 @@ type (
 		InReplyToStatusID string
 		IsQuoted          bool
 		IsPin             bool
+		IsPromoted        bool
 		IsReply           bool
 		IsRetweet         bool
 		IsSelfThread      bool
@@ -59,6 +60,7 @@ type (
 		PermanentURL      string
 		Photos            []Photo
 		Place             *Place
+		PromotedMetadata  *PromotedMetadata
 		QuotedStatus      *Tweet
 		QuotedStatusID    string
 		Replies           int
@@ -75,6 +77,42 @@ type (
 		Videos            []Video
 		Views             int
 		SensitiveContent  bool
+	}
+
+	// PromotedMetadata contains ad/promoted tweet metadata from the X.com timeline API.
+	// Present only when the tweet is a promoted (paid) tweet. nil for organic tweets.
+	PromotedMetadata struct {
+		AdMetadataContainer struct {
+			IsQuickPromote            bool `json:"isQuickPromote"`
+			RenderLegacyWebsiteCard   bool `json:"renderLegacyWebsiteCard"`
+			RenderSalesCtaWebsiteCard bool `json:"renderSalesCtaWebsiteCard"`
+		} `json:"adMetadataContainer"`
+		AdvertiserResults struct {
+			Result struct {
+				Typename       string `json:"__typename"`
+				ID             string `json:"id"`
+				RestID         string `json:"rest_id"`
+				IsBlueVerified bool   `json:"is_blue_verified"`
+				Core           struct {
+					CreatedAt  string `json:"created_at"`
+					Name       string `json:"name"`
+					ScreenName string `json:"screen_name"`
+				} `json:"core"`
+			} `json:"result"`
+		} `json:"advertiser_results"`
+		ClickTrackingInfo struct {
+			URLParams []struct {
+				Key   string `json:"key"`
+				Value string `json:"value"`
+			} `json:"urlParams"`
+		} `json:"clickTrackingInfo"`
+		DisclosureType   string `json:"disclosureType"`
+		ExperimentValues []struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		} `json:"experimentValues"`
+		ImpressionID     string `json:"impressionId"`
+		ImpressionString string `json:"impressionString"`
 	}
 
 	// ProfileResult of scrapping.

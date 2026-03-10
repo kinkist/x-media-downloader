@@ -6,7 +6,7 @@
 // Usage:
 //
 //	go run ./examples/processor                         # download only, no DB/NSFW
-//	go run ./examples/processor -config config.json     # include DB + NSFW
+//	go run ./examples/processor -config config.yaml     # include DB + NSFW
 //	go run ./examples/processor -datadir /tmp/tweets -debug
 package main
 
@@ -25,7 +25,7 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", "", "path to config.json (optional)")
+	configPath := flag.String("config", "", "path to config.yaml (optional)")
 	dataDirFlag := flag.String("datadir", "data", "media storage directory")
 	debugFlag := flag.Bool("debug", false, "enable debug output")
 	flag.Parse()
@@ -35,7 +35,7 @@ func main() {
 	dataDir := *dataDirFlag
 
 	// ── 1. load config (optional) ─────────────────────────────────
-	// Ignore errors so the example works without a config.json.
+	// Ignore errors so the example works without a config.yaml.
 	cfg, cfgErr := config.Load(*configPath)
 	if cfgErr == nil {
 		if cfg.Debug {
@@ -63,13 +63,21 @@ func main() {
 		}
 
 		// ── 3. NSFW initialization (optional) ────────────────────
-		// When NSFW model is available, detection runs automatically after download.
-		if cfg.Nsfwmodelpath != "" {
-			if err := nsfw.Init(cfg.Nsfwmodelpath, cfg.Onnxlibpath,
-				cfg.Nsfwinputname, cfg.Nsfwoutputname); err != nil {
-				fmt.Fprintf(os.Stderr, "[WARN] NSFW initialization failed, continuing without NSFW: %v\n", err)
+		// Both OpenNSFW2 and NudeNet v2 can run simultaneously.
+		// Detection runs automatically after each media file is downloaded.
+		if cfg.Opennsfw2modelpath != "" {
+			if err := nsfw.Init(cfg.Opennsfw2modelpath, cfg.Onnxlibpath,
+				cfg.Opennsfw2inputname, cfg.Opennsfw2outputname); err != nil {
+				fmt.Fprintf(os.Stderr, "[WARN] OpenNSFW2 initialization failed, continuing without it: %v\n", err)
 			} else {
 				defer nsfw.Close()
+			}
+		}
+		if cfg.Nudenetv2modelpath != "" {
+			if err := nsfw.InitNudeNet(cfg.Nudenetv2modelpath, cfg.Onnxlibpath); err != nil {
+				fmt.Fprintf(os.Stderr, "[WARN] NudeNet v2 initialization failed, continuing without it: %v\n", err)
+			} else {
+				defer nsfw.CloseNudeNet()
 			}
 		}
 	} else {

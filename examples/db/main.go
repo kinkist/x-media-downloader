@@ -2,12 +2,12 @@
 //
 // Prerequisites:
 //   - MySQL server must be running
-//   - config.json must have dbhost, dbuser, dbpass, dbdatabasename set
+//   - config.yaml must have dbhost, dbuser, dbpass, dbdatabasename set
 //
 // Usage:
 //
 //	go run ./examples/db
-//	go run ./examples/db -config /path/to/config.json
+//	go run ./examples/db -config /path/to/config.yaml
 package main
 
 import (
@@ -21,7 +21,7 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", "", "path to config.json")
+	configPath := flag.String("config", "", "path to config.yaml")
 	debugFlag := flag.Bool("debug", false, "enable debug output")
 	flag.Parse()
 
@@ -34,7 +34,7 @@ func main() {
 		os.Exit(1)
 	}
 	if cfg.Dbhost == "" || cfg.Dbdatabasename == "" {
-		fmt.Fprintln(os.Stderr, "config.json must have dbhost / dbdatabasename set")
+		fmt.Fprintln(os.Stderr, "config.yaml must have dbhost / dbdatabasename set")
 		os.Exit(1)
 	}
 

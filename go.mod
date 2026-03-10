@@ -19,4 +19,5 @@ require (
 	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/yalue/onnxruntime_go v1.27.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
