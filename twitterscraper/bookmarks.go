@@ -18,7 +18,7 @@ func (s *Scraper) FetchBookmarks(maxTweetsNbr int, cursor string) ([]*Tweet, str
 		maxTweetsNbr = 200
 	}
 
-	req, err := s.newRequest("GET", "https://x.com/i/api/graphql/-IyJFt9_jS_9d_vS3NN-fA/Bookmarks")
+	req, err := s.newRequest("GET", "https://x.com/i/api/graphql/Yq6CSGrtJaZyTpxVkrzLnA/Bookmarks")
 	if err != nil {
 		return nil, "", err
 	}

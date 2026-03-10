@@ -35,7 +35,8 @@ const (
 	nudeImgSize = 320
 	// defaultNudeThreshold is the fixed detection confidence threshold.
 	// Not configurable — always 0.6 to reduce false positives.
-	defaultNudeThreshold = float32(0.6)
+	//defaultNudeThreshold = float32(0.6)
+	defaultNudeThreshold = float32(0.1)
 
 	// ONNX tensor names (verified from model introspection)
 	nudeInputName  = "input_1:0"
