@@ -27,7 +27,7 @@ func main() {
 	// --- CLI flags ---
 	var (
 		debugFlag  = flag.Bool("debug", false, "enable debug mode")
-		configPath = flag.String("config", "", "config file path (default: config.json next to executable or CWD)")
+		configPath = flag.String("config", "", "config file path (default: config.yaml next to executable or CWD)")
 		countFlag  = flag.Int("count", 100, "maximum number of tweets to collect")
 	)
 	flag.Parse()
@@ -44,8 +44,8 @@ func main() {
 		logger.Enabled = true
 		logger.Debug("=== debug mode enabled ===")
 	}
-	logger.Debug("config loaded — datadir=%q dbhost=%q nsfwmodel=%q",
-		cfg.Datadir, cfg.Dbhost, cfg.Nsfwmodelpath)
+	logger.Debug("config loaded — datadir=%q dbhost=%q opennsfw2=%q nudenetv2=%q",
+		cfg.Datadir, cfg.Dbhost, cfg.Opennsfw2modelpath, cfg.Nudenetv2modelpath)
 
 	// --- prevent duplicate execution ---
 	if err := pidfile.CheckAndCreatePidFile(); err != nil {
@@ -74,18 +74,33 @@ func main() {
 		logger.Debug("no DB config (dbhost=%q dbdatabasename=%q)", cfg.Dbhost, cfg.Dbdatabasename)
 	}
 
-	// --- NSFW detector initialization (only when nsfwmodelpath is set in config) ---
-	if cfg.Nsfwmodelpath != "" {
-		logger.Debug("NSFW model config detected — path=%s", cfg.Nsfwmodelpath)
-		if err := nsfw.Init(cfg.Nsfwmodelpath, cfg.Onnxlibpath,
-			cfg.Nsfwinputname, cfg.Nsfwoutputname); err != nil {
-			fmt.Fprintf(os.Stderr, "[WARN] NSFW init failed, continuing without detection: %v\n", err)
+	// --- NSFW detector initialization (both can run simultaneously) ---
+	nsfwAny := false
+
+	if cfg.Opennsfw2modelpath != "" {
+		logger.Debug("OpenNSFW2 config detected — path=%s", cfg.Opennsfw2modelpath)
+		if err := nsfw.Init(cfg.Opennsfw2modelpath, cfg.Onnxlibpath,
+			cfg.Opennsfw2inputname, cfg.Opennsfw2outputname); err != nil {
+			fmt.Fprintf(os.Stderr, "[WARN] OpenNSFW2 init failed, continuing without it: %v\n", err)
 		} else {
 			defer nsfw.Close()
+			nsfwAny = true
 		}
-	} else {
-		fmt.Println("[NSFW] model path not set, NSFW detection disabled")
-		logger.Debug("NSFW disabled (nsfwmodelpath not set)")
+	}
+
+	if cfg.Nudenetv2modelpath != "" {
+		logger.Debug("NudeNet v2 config detected — path=%s", cfg.Nudenetv2modelpath)
+		if err := nsfw.InitNudeNet(cfg.Nudenetv2modelpath, cfg.Onnxlibpath); err != nil {
+			fmt.Fprintf(os.Stderr, "[WARN] NudeNet v2 init failed, continuing without it: %v\n", err)
+		} else {
+			defer nsfw.CloseNudeNet()
+			nsfwAny = true
+		}
+	}
+
+	if !nsfwAny {
+		fmt.Println("[NSFW] no NSFW model configured, skipping")
+		logger.Debug("NSFW disabled (opennsfw2modelpath and nudenetv2modelpath not set)")
 	}
 
 	// --- determine data storage path ---
@@ -106,7 +121,7 @@ func main() {
 	} else {
 		// cookies.json found → fetch home timeline tweets and download media
 		logger.Debug("cookies.json found — starting tweet fetch mode (count=%d)", *countFlag)
-		if err := fetchTweets(cookieFile, dataDir, *countFlag); err != nil {
+		if err := fetchTweets(cookieFile, dataDir, *countFlag, cfg.Exceptpromoted); err != nil {
 			fmt.Fprintln(os.Stderr, "failed to fetch tweets:", err)
 			os.Exit(1)
 		}
@@ -116,7 +131,7 @@ func main() {
 // fetchTweets reads cookies from cookieFile, collects up to count home timeline
 // tweets, and saves media to dataDir. Cookie changes during the session are
 // persisted back to cookieFile.
-func fetchTweets(cookieFile, dataDir string, count int) error {
+func fetchTweets(cookieFile, dataDir string, count int, exceptPromoted bool) error {
 	// load cookies and initialize scraper
 	raw, err := loadcookies.LoadRaw(cookieFile)
 	if err != nil {
@@ -149,6 +164,13 @@ func fetchTweets(cookieFile, dataDir string, count int) error {
 
 		tw := &result.Tweet
 		printTweet(fetched, tw)
+
+		// skip promoted (ad) tweets if configured
+		if exceptPromoted && tw.IsPromoted {
+			logger.Debug("tweet [%d] skipped — promoted tweet (exceptpromoted=true)", fetched)
+			fmt.Printf("  [SKIP] promoted tweet\n")
+			continue
+		}
 
 		// download media (images/videos/GIFs)
 		tweetStart := time.Now()

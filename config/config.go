@@ -1,40 +1,50 @@
-// Package config loads program configuration from a JSON file.
+// Package config loads program configuration from a YAML file.
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Config holds all configuration for x-media-downloader.
 // No username/password fields — authentication is handled via cookieswithchromedp.
 type Config struct {
-	Datadir        string `json:"datadir"`
-	Debug          bool   `json:"debug"`
+	Datadir        string `yaml:"datadir"`
+	Debug          bool   `yaml:"debug"`
 
-	Dbhost         string `json:"dbhost"`
-	Dbuser         string `json:"dbuser"`
-	Dbpass         string `json:"dbpass"`
-	Dbdatabasename string `json:"dbdatabasename"`
+	Dbhost         string `yaml:"dbhost"`
+	Dbuser         string `yaml:"dbuser"`
+	Dbpass         string `yaml:"dbpass"`
+	Dbdatabasename string `yaml:"dbdatabasename"`
 
-	// NSFW detection (optional)
-	// nsfwmodelpath  : ONNX model file path (empty = NSFW detection disabled)
-	// onnxlibpath    : ONNX Runtime shared library path (empty = system default)
-	// nsfwinputname  : ONNX model input tensor name
-	// nsfwoutputname : ONNX model output tensor name
-	Nsfwmodelpath  string `json:"nsfwmodelpath"`
-	Onnxlibpath    string `json:"onnxlibpath"`
-	Nsfwinputname  string `json:"nsfwinputname"`
-	Nsfwoutputname string `json:"nsfwoutputname"`
+	// ONNX Runtime shared library path (shared by both NSFW models).
+	// Leave empty to use the system default.
+	Onnxlibpath string `yaml:"onnxlibpath"`
+
+	// OpenNSFW2 binary classifier (optional).
+	// Set opennsfw2modelpath to enable. Both models can run simultaneously.
+	// opennsfw2inputname / opennsfw2outputname: tensor names (empty = auto-detect)
+	Opennsfw2modelpath  string `yaml:"opennsfw2modelpath"`
+	Opennsfw2inputname  string `yaml:"opennsfw2inputname"`
+	Opennsfw2outputname string `yaml:"opennsfw2outputname"`
+
+	// NudeNet v2 object detector (optional).
+	// Set nudenetv2modelpath to enable. Detection threshold is fixed at 0.6.
+	Nudenetv2modelpath string `yaml:"nudenetv2modelpath"`
+
+	// Skip downloading media from promoted (ad) tweets.
+	// Default: false (download promoted tweets too).
+	Exceptpromoted bool `yaml:"exceptpromoted"`
 }
 
 // Load reads the config from path. If path is empty, it searches in order:
-//  1. config.json in the same directory as the executable (binary)
-//  2. config.json in the current working directory (CWD) ← fallback for go run
+//  1. config.yaml in the same directory as the executable (binary)
+//  2. config.yaml in the current working directory (CWD) ← fallback for go run
 //
-// config.json is optional when no explicit path is given.
+// config.yaml is optional when no explicit path is given.
 // If the file is not found, default values are used:
 //   - datadir  → "data" (set by main.go)
 //   - db*      → DB connection skipped
@@ -50,29 +60,26 @@ func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if !explicit && os.IsNotExist(err) {
-			// config.json not found and no explicit path was given — use defaults
 			return &Config{}, nil
 		}
 		return nil, fmt.Errorf("failed to read config file %q: %w", path, err)
 	}
 
 	var cfg Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config file %q: %w", path, err)
 	}
 	return &cfg, nil
 }
 
-// resolveConfigPath returns the path to config.json, checking executable dir
+// resolveConfigPath returns the path to config.yaml, checking executable dir
 // first (for compiled binary) and then CWD (for go run).
 func resolveConfigPath() string {
-	// 1. executable directory
 	if exe, err := os.Executable(); err == nil {
-		candidate := filepath.Join(filepath.Dir(exe), "config.json")
+		candidate := filepath.Join(filepath.Dir(exe), "config.yaml")
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate
 		}
 	}
-	// 2. CWD fallback (for go run)
-	return "config.json"
+	return "config.yaml"
 }

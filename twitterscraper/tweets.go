@@ -360,8 +360,9 @@ type homeEntry struct {
 	Content   struct {
 		EntryType   string `json:"entryType"`
 		ItemContent struct {
-			ItemType     string `json:"itemType"`
-			TweetResults struct {
+			ItemType         string            `json:"itemType"`
+			PromotedMetadata *PromotedMetadata `json:"promotedMetadata"`
+			TweetResults     struct {
 				Result result `json:"result"`
 			} `json:"tweet_results"`
 		} `json:"itemContent"`
@@ -396,9 +397,16 @@ func (timeline *homeTimeline) parseTweets() ([]*Tweet, string) {
 		for _, entry := range instruction.Entries {
 			if entry.Content.CursorType == "Bottom" {
 				cursor = entry.Content.Cursor
-			} else if entry.Content.ItemContent.TweetResults.Result.Typename == "Tweet" {
-				if tweet := entry.Content.ItemContent.TweetResults.Result.parse(); tweet != nil {
-					tweets = append(tweets, tweet)
+			} else {
+				typename := entry.Content.ItemContent.TweetResults.Result.Typename
+				if typename == "Tweet" || typename == "TweetWithVisibilityResults" {
+					if tweet := entry.Content.ItemContent.TweetResults.Result.parse(); tweet != nil {
+						if entry.Content.ItemContent.PromotedMetadata != nil {
+							tweet.IsPromoted = true
+							tweet.PromotedMetadata = entry.Content.ItemContent.PromotedMetadata
+						}
+						tweets = append(tweets, tweet)
+					}
 				}
 			}
 		}

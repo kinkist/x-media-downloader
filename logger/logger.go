@@ -9,7 +9,7 @@ import (
 )
 
 // Enabled controls whether debug output is printed.
-// Set to true via CLI flag (-debug) or config.json {"debug": true}.
+// Set to true via CLI flag (-debug) or config.yaml {"debug": true}.
 var Enabled bool
 
 // Debug prints a timestamped debug line to stdout if debug mode is enabled.

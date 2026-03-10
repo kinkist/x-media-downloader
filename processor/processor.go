@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -61,7 +62,7 @@ func ProcessTweet(tweet *twitterscraper.Tweet, dataDir string) error {
 
 	// base filename: {screenname}-{userid}-{tweetID}-{tweet creation time}
 	tweetTime := src.TimeParsed.Format("20060102_150405")
-	baseName := fmt.Sprintf("%s-%s-%s-%s", src.Username, src.UserID, src.ID, tweetTime)
+	baseName := fmt.Sprintf("%s-%s-%s-%s", sanitizeUsername(src.Username), src.UserID, src.ID, tweetTime)
 	logger.Debug("base filename: %s", baseName)
 
 	// --- save text ---
@@ -275,6 +276,27 @@ func downloadFile(rawURL, dst string) error {
 	n, err := io.Copy(f, resp.Body)
 	logger.Debug("file saved: %s (%d bytes)", filepath.Base(dst), n)
 	return err
+}
+
+// reUnsafeUsername matches any character not allowed in a Twitter username [A-Za-z0-9_].
+// Compiled once at package level for efficiency.
+var reUnsafeUsername = regexp.MustCompile(`[^A-Za-z0-9_]`)
+
+// sanitizeUsername strips characters that are unsafe for filenames and enforces a
+// maximum length of 50. Returns "_" if the result would otherwise be empty.
+//
+// Twitter usernames are officially [A-Za-z0-9_], but the API occasionally returns
+// empty or non-ASCII values (e.g. for restricted accounts). Without sanitization,
+// baseName would start with "-" and produce paths like "-userid-tweetid-time.txt".
+func sanitizeUsername(name string) string {
+	s := reUnsafeUsername.ReplaceAllString(name, "")
+	if len(s) > 50 {
+		s = s[:50]
+	}
+	if s == "" {
+		return "_"
+	}
+	return s
 }
 
 // photoExt extracts the file extension from a Twitter image URL.
