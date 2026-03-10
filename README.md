@@ -9,6 +9,7 @@ A Go CLI tool that logs into X.com (formerly Twitter) via a real Chrome browser,
 | Feature | Description |
 |---------|-------------|
 | Home timeline collection | Fetches tweets automatically (`-count` flag controls the limit) |
+| Liked tweets collection | Fetches the authenticated user's liked tweets via `GetLikes` / `FetchLikes`; `userId` is auto-extracted from the `twid` cookie |
 | Media download | Downloads images, videos, and GIFs; video thumbnails are saved to `image/` |
 | Retweet handling | Stored under `retwitted/` subdirectory using the original author's info |
 | Promoted tweet detection | `Tweet.IsPromoted` and `Tweet.PromotedMetadata` populated for ad tweets; `exceptpromoted: true` in config skips media download for promoted tweets |
@@ -165,7 +166,7 @@ Two models are supported and can **run simultaneously** when both paths are set.
 | `opennsfw2outputname` | Output tensor name (empty = auto-detected, fallback `"output"`) |
 | `nudenetv2modelpath` | Path to `detector_v2_default_checkpoint.onnx` (empty = disabled) |
 
-> **NudeNet v2 detection threshold** is fixed at `0.6` and is not configurable.
+> **NudeNet v2 detection threshold** is fixed at `0.1` and is not configurable.
 
 ---
 
@@ -395,6 +396,8 @@ CREATE TABLE downloaded_files (
 ├── twitterscraper/                  # Local fork of imperatrona/twitter-scraper (modified)
 │   ├── auth.go                      # SetCookies auto-sets isLogged + bearerToken1
 │   ├── tweets.go                    # GetHomeTweets, GetForYouTweets, etc.
+│   ├── likes.go                     # GetLikes, FetchLikes — liked tweets via GraphQL Likes endpoint
+│   ├── timeline_v2.go               # timelineV2, likesTimelineV2, bookmarksTimelineV2, parseTweets()
 │   └── ...
 │
 ├── examples/                        # Runnable usage examples for each package
@@ -539,6 +542,26 @@ exceptpromoted: true
 ```
 
 When a promoted tweet is encountered, the output shows `[SKIP] promoted tweet` and the tweet is counted but its media is not downloaded. The `Tweet.IsPromoted` field is always populated regardless of this setting — it is the download step that is skipped, not the detection.
+
+### Likes API (`twitterscraper/likes.go`)
+
+The Likes endpoint returns tweets the authenticated user has liked.
+
+```go
+for tweet := range scraper.GetLikes(ctx, 100) {
+    // tweet.Tweet, tweet.Err
+}
+```
+
+| Item | Detail |
+|------|--------|
+| Endpoint | `GET https://x.com/i/api/graphql/j-O2fOmYBTqofGfn6LMb8g/Likes` |
+| Response path | `data.user.result.`**`timeline`**`.timeline.instructions` |
+| Standard timeline path | `data.user.result.`**`timeline_v2`**`.timeline.instructions` |
+| `userId` source | Extracted automatically from the `twid` cookie (`u%3D12345` → `12345`) |
+| Response struct | `likesTimelineV2` (defined in `timeline_v2.go`) |
+
+> **Note:** The Likes API uses `timeline` as the JSON key, not `timeline_v2`. A dedicated `likesTimelineV2` struct is used instead of the shared `timelineV2` to correctly map this path.
 
 ---
 
