@@ -439,6 +439,7 @@ func (s *Scraper) fetchHomeTweets(_ string, maxTweetsNbr int, cursor string) ([]
 		"includePromotedContent":                 true,
 		"withQuickPromoteEligibilityTweetFields": true,
 		"requestContext":                         "launch",
+		"enableRanking":                          false,
 	}
 
 	if cursor != "" {
