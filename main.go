@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"time"
+	"path/filepath"
 
 	"github.com/kinkist/x-media-downloader/config"
 	"github.com/kinkist/x-media-downloader/cookieswithchromedp"
@@ -19,7 +20,6 @@ import (
 )
 
 const (
-	cookieFile      = "cookies.json"
 	maxConsecErrors = 5
 )
 
@@ -109,6 +109,13 @@ func main() {
 		dataDir = "data"
 	}
 	logger.Debug("data storage path: %s", dataDir)
+
+	cookieFile := ""
+
+	if exe, err := os.Executable(); err == nil {
+		cookieFile = filepath.Join(filepath.Dir(exe), "cookies.json")
+	}
+	fmt.Println("cookies.json", cookieFile)
 
 	// --- branch depending on whether cookies.json exists ---
 	if _, err := os.Stat(cookieFile); os.IsNotExist(err) {
