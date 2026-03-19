@@ -28,7 +28,9 @@ import (
 //	date/{YYYY}/{MM}/{DD}/video[/retwitted]/{screenname}-{userid}-{tweetID}.jpg  (thumb)
 //	date/{YYYY}/{MM}/{DD}/text[/retwitted]/{screenname}-{userid}-{tweetID}.txt
 func ProcessTweet(tweet *twitterscraper.Tweet, dataDir string) error {
-	isRT := tweet.IsRetweet && tweet.RetweetedStatus != nil
+	// self-retweets (user retweeting their own tweet) are treated as originals
+	isRT := tweet.IsRetweet && tweet.RetweetedStatus != nil &&
+		!strings.EqualFold(tweet.Username, tweet.RetweetedStatus.Username)
 
 	// source tweet (uses RetweetedStatus for retweets)
 	src := tweet

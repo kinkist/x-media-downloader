@@ -110,12 +110,13 @@ func main() {
 	}
 	logger.Debug("data storage path: %s", dataDir)
 
-	cookieFile := ""
-
-	if exe, err := os.Executable(); err == nil {
-		cookieFile = filepath.Join(filepath.Dir(exe), "cookies.json")
+	exe, err := os.Executable()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "failed to resolve executable path:", err)
+		os.Exit(1)
 	}
-	fmt.Println("cookies.json", cookieFile)
+	cookieFile := filepath.Join(filepath.Dir(exe), "cookies.json")
+	logger.Debug("cookie file path: %s", cookieFile)
 
 	// --- branch depending on whether cookies.json exists ---
 	if _, err := os.Stat(cookieFile); os.IsNotExist(err) {
