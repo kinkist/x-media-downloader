@@ -11,7 +11,7 @@ A Go CLI tool that logs into X.com (formerly Twitter) via a real Chrome browser,
 | Home timeline collection | Fetches tweets automatically (`-count` flag controls the limit) |
 | Liked tweets collection | Fetches the authenticated user's liked tweets via `GetLikes` / `FetchLikes`; `userId` is auto-extracted from the `twid` cookie |
 | Media download | Downloads images, videos, and GIFs; video thumbnails are saved to `image/` |
-| Retweet handling | Stored under `retwitted/` subdirectory using the original author's info |
+| Retweet handling | Stored under `retwitted/` subdirectory using the original author's info; self-retweets (user retweeting their own tweet) are treated as originals and stored in the standard directory |
 | Promoted tweet detection | `Tweet.IsPromoted` and `Tweet.PromotedMetadata` populated for ad tweets; `exceptpromoted: true` in config skips media download for promoted tweets |
 | Date-based directories | Auto-organized as `date/YYYY/MM/DD/` |
 | Duplicate prevention | MySQL DB-based download tracking (optional); falls back to file-existence check |
@@ -313,7 +313,7 @@ binary directory/
 ```
 
 - Multiple media per tweet: `{baseName}-0.jpg`, `{baseName}-1.jpg`, …
-- Retweets: stored under `retwitted/` using the original author's info
+- Retweets: stored under `retwitted/` using the original author's info (self-retweets are stored in the standard directory)
 - Twitter GIFs: saved as `.mp4` (Twitter API delivers GIFs as mp4)
 - Video thumbnails: saved alongside images in `image/`
 
