@@ -14,7 +14,6 @@ import (
 
 	"github.com/kinkist/x-media-downloader/db"
 	"github.com/kinkist/x-media-downloader/logger"
-	"github.com/kinkist/x-media-downloader/nsfw"
 	"github.com/kinkist/x-media-downloader/twitterscraper"
 )
 
@@ -187,19 +186,11 @@ func decideDownload(rawURL, dst string) bool {
 	return true
 }
 
-// hasNSFWValue reports whether filePath + ".nsfwvalue.txt" exists.
-func hasNSFWValue(filePath string) bool {
-	_, err := os.Stat(filePath + ".nsfwvalue.txt")
-	return err == nil
-}
-
-// downloadTrackAndNSFW performs download decision → download → NSFW detection → DB record in sequence.
+// downloadTrackAndNSFW performs download decision → download → DB record in sequence.
 //
 //  1. decideDownload: return immediately if skip condition met
 //  2. on download failure, log warning and return (no DB record)
-//  3. NSFW: skip if .nsfwvalue.txt already exists (treated as success);
-//     otherwise run detection — on failure, no DB record
-//  4. DB record only when both download and NSFW succeeded
+//  3. DB record only when download succeeded
 func downloadTrackAndNSFW(rawURL, dst, tweetID, username, userID, fileType string, isRetweet bool) {
 	if !decideDownload(rawURL, dst) {
 		return
@@ -213,17 +204,8 @@ func downloadTrackAndNSFW(rawURL, dst, tweetID, username, userID, fileType strin
 	}
 	logger.Debug("download complete (%.3fs): %s", time.Since(t0).Seconds(), filepath.Base(dst))
 
-	// NSFW detection (skip if .nsfwvalue.txt already exists — treated as success)
-	nsfwOK := true
-	if hasNSFWValue(dst) {
-		logger.Debug("NSFW result already exists, skipping: %s", filepath.Base(dst))
-	} else {
-		nsfwOK = nsfw.DetectAndSaveNSFW(dst)
-	}
-
-	// record in DB only when both download and NSFW succeeded
-	// store URL without query params so lookups are stable regardless of ?tag= value
-	if db.DB != nil && nsfwOK {
+	// record in DB — store URL without query params so lookups are stable regardless of ?tag= value
+	if db.DB != nil {
 		if err := db.MarkFileDownloaded(stripQuery(rawURL), dst, tweetID, username, userID, fileType, isRetweet); err != nil {
 			fmt.Fprintf(os.Stderr, "  [WARN] DB record failed (%s): %v\n", filepath.Base(dst), err)
 		}

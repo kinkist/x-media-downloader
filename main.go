@@ -13,7 +13,6 @@ import (
 	"github.com/kinkist/x-media-downloader/db"
 	"github.com/kinkist/x-media-downloader/loadcookies"
 	"github.com/kinkist/x-media-downloader/logger"
-	"github.com/kinkist/x-media-downloader/nsfw"
 	"github.com/kinkist/x-media-downloader/pidfile"
 	"github.com/kinkist/x-media-downloader/processor"
 	"github.com/kinkist/x-media-downloader/twitterscraper"
@@ -44,8 +43,7 @@ func main() {
 		logger.Enabled = true
 		logger.Debug("=== debug mode enabled ===")
 	}
-	logger.Debug("config loaded — datadir=%q dbhost=%q opennsfw2=%q nudenetv2=%q",
-		cfg.Datadir, cfg.Dbhost, cfg.Opennsfw2modelpath, cfg.Nudenetv2modelpath)
+	logger.Debug("config loaded — datadir=%q dbhost=%q", cfg.Datadir, cfg.Dbhost)
 
 	// --- prevent duplicate execution ---
 	if err := pidfile.CheckAndCreatePidFile(); err != nil {
@@ -72,35 +70,6 @@ func main() {
 	} else {
 		fmt.Println("[DB] no DB config, continuing without file tracking")
 		logger.Debug("no DB config (dbhost=%q dbdatabasename=%q)", cfg.Dbhost, cfg.Dbdatabasename)
-	}
-
-	// --- NSFW detector initialization (both can run simultaneously) ---
-	nsfwAny := false
-
-	if cfg.Opennsfw2modelpath != "" {
-		logger.Debug("OpenNSFW2 config detected — path=%s", cfg.Opennsfw2modelpath)
-		if err := nsfw.Init(cfg.Opennsfw2modelpath, cfg.Onnxlibpath,
-			cfg.Opennsfw2inputname, cfg.Opennsfw2outputname); err != nil {
-			fmt.Fprintf(os.Stderr, "[WARN] OpenNSFW2 init failed, continuing without it: %v\n", err)
-		} else {
-			defer nsfw.Close()
-			nsfwAny = true
-		}
-	}
-
-	if cfg.Nudenetv2modelpath != "" {
-		logger.Debug("NudeNet v2 config detected — path=%s", cfg.Nudenetv2modelpath)
-		if err := nsfw.InitNudeNet(cfg.Nudenetv2modelpath, cfg.Onnxlibpath); err != nil {
-			fmt.Fprintf(os.Stderr, "[WARN] NudeNet v2 init failed, continuing without it: %v\n", err)
-		} else {
-			defer nsfw.CloseNudeNet()
-			nsfwAny = true
-		}
-	}
-
-	if !nsfwAny {
-		fmt.Println("[NSFW] no NSFW model configured, skipping")
-		logger.Debug("NSFW disabled (opennsfw2modelpath and nudenetv2modelpath not set)")
 	}
 
 	// --- determine data storage path ---

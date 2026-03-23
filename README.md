@@ -15,7 +15,6 @@ A Go CLI tool that logs into X.com (formerly Twitter) via a real Chrome browser,
 | Promoted tweet detection | `Tweet.IsPromoted` and `Tweet.PromotedMetadata` populated for ad tweets; `exceptpromoted: true` in config skips media download for promoted tweets |
 | Date-based directories | Auto-organized as `date/YYYY/MM/DD/` |
 | Duplicate prevention | MySQL DB-based download tracking (optional); falls back to file-existence check |
-| NSFW detection | GPU-accelerated image/video classification via ONNX (optional); supports OpenNSFW2 and NudeNet v2 simultaneously |
 | Consecutive error guard | Stops automatically after 5 consecutive errors in the tweet fetch loop |
 | Debug mode | Verbose internal logging via `-debug` flag or `config.yaml` |
 | Duplicate execution guard | PID file prevents multiple simultaneous instances |
@@ -43,11 +42,7 @@ rm cookies.json && go run main.go
 - **CGo enabled** (`CGO_ENABLED=1`, the default)
 - **Google Chrome** installed
 - macOS or Linux (Windows untested)
-- **ffmpeg** — required only for video NSFW detection
-  - macOS: `brew install ffmpeg`
-  - Ubuntu: `sudo apt install ffmpeg`
-
-> **Cross-compilation is not supported.** The `onnxruntime_go` package uses CGo, so the binary must be built on the target machine.
+> **Cross-compilation is not supported.** Build on the target machine.
 > Apple Silicon Mac → `arm64` binary; Intel Mac → `amd64` binary.
 
 ---
@@ -105,7 +100,6 @@ make clean
 |---------|---------|
 | `datadir` | `./data` |
 | DB settings | DB connection skipped |
-| NSFW settings | NSFW detection disabled |
 
 Place `config.yaml` in the **same directory as the binary** (or in the current working directory when using `go run`) to override defaults.
 
@@ -124,15 +118,6 @@ dbhost: "127.0.0.1:3306"
 dbuser: ""
 dbpass: ""
 dbdatabasename: ""
-
-# NSFW detection (optional)
-onnxlibpath: ""
-
-opennsfw2modelpath:  "/path/to/nsfw_model.onnx"
-opennsfw2inputname:  ""
-opennsfw2outputname: ""
-
-nudenetv2modelpath: "/path/to/detector_v2_default_checkpoint.onnx"
 ```
 
 ### Core settings
@@ -145,6 +130,7 @@ nudenetv2modelpath: "/path/to/detector_v2_default_checkpoint.onnx"
 
 ### MySQL download tracking (optional)
 
+
 DB connection failure is non-fatal — the program continues with file-existence check only.
 
 | Key | Description |
@@ -153,112 +139,6 @@ DB connection failure is non-fatal — the program continues with file-existence
 | `dbuser` | DB username |
 | `dbpass` | DB password |
 | `dbdatabasename` | Database name (auto-created if it does not exist) |
-
-### NSFW detection (optional)
-
-Two models are supported and can **run simultaneously** when both paths are set.
-
-| Key | Description |
-|-----|-------------|
-| `onnxlibpath` | ONNX Runtime shared library path (empty = system default; shared by both models) |
-| `opennsfw2modelpath` | Path to the OpenNSFW2 `.onnx` model file (empty = disabled) |
-| `opennsfw2inputname` | Input tensor name (empty = auto-detected, fallback `"input"`) |
-| `opennsfw2outputname` | Output tensor name (empty = auto-detected, fallback `"output"`) |
-| `nudenetv2modelpath` | Path to `detector_v2_default_checkpoint.onnx` (empty = disabled) |
-
-> **NudeNet v2 detection threshold** is fixed at `0.1` and is not configurable.
-
----
-
-## NSFW Setup
-
-### 1. Install ONNX Runtime
-
-**macOS:**
-```bash
-brew install onnxruntime
-```
-
-**Ubuntu (CPU only):**
-```bash
-ONNX_VER="1.20.1"
-wget https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VER}/onnxruntime-linux-x64-${ONNX_VER}.tgz
-tar xzf onnxruntime-linux-x64-${ONNX_VER}.tgz
-sudo cp onnxruntime-linux-x64-${ONNX_VER}/lib/libonnxruntime*.so* /usr/local/lib/
-sudo ldconfig
-```
-
-**Ubuntu (GPU — CUDA required):**
-```bash
-ONNX_VER="1.20.1"
-wget https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VER}/onnxruntime-linux-x64-gpu-${ONNX_VER}.tgz
-tar xzf onnxruntime-linux-x64-gpu-${ONNX_VER}.tgz
-sudo cp onnxruntime-linux-x64-gpu-${ONNX_VER}/lib/libonnxruntime*.so* /usr/local/lib/
-sudo ldconfig
-```
-
-### 2. Prepare model files
-
-**OpenNSFW2** — binary SFW/NSFW classifier:
-
-```bash
-pip install opennsfw2 tf2onnx tensorflow
-
-python3 - <<'EOF'
-import opennsfw2 as n2
-import tf2onnx, tensorflow as tf
-
-model = n2.make_open_nsfw_model()
-input_spec = (tf.TensorSpec((None, 224, 224, 3), tf.float32, name="input"),)
-tf2onnx.convert.from_keras(model, input_signature=input_spec,
-                            output_path="nsfw_model.onnx")
-print("Done: nsfw_model.onnx")
-EOF
-```
-
-**NudeNet v2** — object detector for specific content classes:
-
-Download [detector_v2_default_checkpoint.onnx](https://huggingface.co/gqfwqgw/NudeNet_classifier_model/tree/main)
-
-Detectable classes: `FEMALE_BREAST_EXPOSED`, `FEMALE_GENITALIA_EXPOSED`, `MALE_GENITALIA_EXPOSED`, `ANUS_EXPOSED`, `BUTTOCKS_EXPOSED`, `FACE_FEMALE`, `MALE_BREAST_EXPOSED`, `FEET_EXPOSED`, `ARMPITS_EXPOSED`, `BELLY_EXPOSED`, `FEMALE_BREAST_COVERED`, `FEMALE_GENITALIA_COVERED`, `BUTTOCKS_COVERED`, `ANUS_COVERED`, `FACE_COVERED`, `FEET_COVERED`, `ARMPITS_COVERED`, `BELLY_COVERED`
-
-### 3. Result format
-
-Results are saved alongside each downloaded file as `{filename}.nsfwvalue.txt`.
-
-When **both** models are enabled:
-```
-SFW:  0.9234
-NSFW: 0.0766
-NUDENET: FEMALE_BREAST_EXPOSED:0.8732 ANUS_EXPOSED:0.6123
-```
-
-When only **OpenNSFW2** is enabled:
-```
-SFW:  0.9234
-NSFW: 0.0766
-```
-
-When only **NudeNet v2** is enabled:
-```
-NUDENET: FEMALE_BREAST_EXPOSED:0.8732
-```
-
-### GPU acceleration
-
-| Platform | Order |
-|----------|-------|
-| macOS | CoreML (Apple Neural Engine) → CPU |
-| Linux / Windows | CUDA (NVIDIA GPU) → CPU |
-
-### NSFW execution conditions
-
-| Condition | Action |
-|-----------|--------|
-| File newly downloaded | Run NSFW |
-| File already existed (SKIP) | Skip NSFW |
-| `.nsfwvalue.txt` already exists | Skip NSFW (reuse previous result) |
-| NSFW disabled (no model path) | Always skip |
 
 ---
 
@@ -298,12 +178,10 @@ binary directory/
             └── {DD}/
                 ├── image/
                 │   ├── {screenname}-{userid}-{tweetID}-{time}.jpg
-                │   ├── {screenname}-{userid}-{tweetID}-{time}.jpg.nsfwvalue.txt
                 │   └── retwitted/
                 │       └── {screenname}-{userid}-{tweetID}-{time}.jpg
                 ├── video/
                 │   ├── {screenname}-{userid}-{tweetID}-{time}.mp4
-                │   ├── {screenname}-{userid}-{tweetID}-{time}.mp4.nsfwvalue.txt
                 │   └── retwitted/
                 │       └── {screenname}-{userid}-{tweetID}-{time}.mp4
                 └── text/
@@ -355,18 +233,18 @@ CREATE TABLE downloaded_files (
 
 | URL in DB | File exists | Action |
 |-----------|-------------|--------|
-| No | — | Download → NSFW → DB record |
+| No | — | Download → DB record |
 | Yes | Yes | Skip (`[SKIP]`) |
-| Yes | No | Re-download → NSFW → DB record (`[RETRY]`) |
+| Yes | No | Re-download → DB record (`[RETRY]`) |
 
 **Without DB:**
 
 | File exists | Action |
 |-------------|--------|
-| No | Download → NSFW |
+| No | Download |
 | Yes | Skip (`[SKIP]`) |
 
-> DB record is written **only when both download and NSFW succeed**.
+> DB record is written **only when download succeeds**.
 
 ---
 
@@ -386,11 +264,6 @@ CREATE TABLE downloaded_files (
 │
 ├── db/db.go                         # MySQL download tracking (optional)
 │
-├── nsfw/
-│   ├── nsfw.go                      # Shared utils (frame extraction) + DetectAndSaveNSFW()
-│   ├── opennsfw2.go                 # OpenNSFW2 binary classifier (Init, Close, detect*)
-│   └── nudenetv2.go                 # NudeNet v2 object detector (InitNudeNet, CloseNudeNet, detect*)
-│
 ├── processor/processor.go           # Tweet media downloader and file organizer
 │
 ├── twitterscraper/                  # Local fork of imperatrona/twitter-scraper (modified)
@@ -405,7 +278,6 @@ CREATE TABLE downloaded_files (
 │   ├── db/main.go
 │   ├── loadcookies/main.go
 │   ├── logger/main.go
-│   ├── nsfw/main.go
 │   ├── pidfile/main.go
 │   └── processor/main.go
 │
@@ -426,8 +298,7 @@ main
  ├── loadcookies  (cookie file I/O)
  ├── cookieswithchromedp  (Chrome login)
  ├── db           → logger
- ├── nsfw         → logger  (opennsfw2.go + nudenetv2.go + nsfw.go)
- ├── processor    → db, nsfw, logger, twitterscraper
+ ├── processor    → db, logger, twitterscraper
  └── twitterscraper
 ```
 
@@ -438,7 +309,6 @@ main
 | `github.com/chromedp/chromedp` | v0.14.2 | Chrome control via CDP for manual login |
 | `github.com/chromedp/cdproto` | — | CDP types and commands |
 | `github.com/go-sql-driver/mysql` | v1.9.3 | MySQL driver |
-| `github.com/yalue/onnxruntime_go` | v1.27.0 | ONNX Runtime Go bindings (CGo) |
 | `golang.org/x/net` | v0.51.0 | SOCKS5 proxy support in twitterscraper |
 
 ---
