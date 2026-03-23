@@ -20,21 +20,6 @@ type Config struct {
 	Dbpass         string `yaml:"dbpass"`
 	Dbdatabasename string `yaml:"dbdatabasename"`
 
-	// ONNX Runtime shared library path (shared by both NSFW models).
-	// Leave empty to use the system default.
-	Onnxlibpath string `yaml:"onnxlibpath"`
-
-	// OpenNSFW2 binary classifier (optional).
-	// Set opennsfw2modelpath to enable. Both models can run simultaneously.
-	// opennsfw2inputname / opennsfw2outputname: tensor names (empty = auto-detect)
-	Opennsfw2modelpath  string `yaml:"opennsfw2modelpath"`
-	Opennsfw2inputname  string `yaml:"opennsfw2inputname"`
-	Opennsfw2outputname string `yaml:"opennsfw2outputname"`
-
-	// NudeNet v2 object detector (optional).
-	// Set nudenetv2modelpath to enable. Detection threshold is fixed at 0.6.
-	Nudenetv2modelpath string `yaml:"nudenetv2modelpath"`
-
 	// Skip downloading media from promoted (ad) tweets.
 	// Default: false (download promoted tweets too).
 	Exceptpromoted bool `yaml:"exceptpromoted"`
@@ -48,7 +33,6 @@ type Config struct {
 // If the file is not found, default values are used:
 //   - datadir  → "data" (set by main.go)
 //   - db*      → DB connection skipped
-//   - nsfw*    → NSFW detection disabled
 //
 // If an explicit -config path is provided but the file does not exist, an error is returned.
 func Load(path string) (*Config, error) {

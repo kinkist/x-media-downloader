@@ -1,12 +1,12 @@
 // examples/processor: usage example for the processor package
 //
 // Creates a mock tweet with real X.com image URLs and runs ProcessTweet().
-// DB / NSFW are optional — downloading works normally without them.
+// DB is optional — downloading works normally without it.
 //
 // Usage:
 //
-//	go run ./examples/processor                         # download only, no DB/NSFW
-//	go run ./examples/processor -config config.yaml     # include DB + NSFW
+//	go run ./examples/processor                         # download only, no DB
+//	go run ./examples/processor -config config.yaml     # include DB
 //	go run ./examples/processor -datadir /tmp/tweets -debug
 package main
 
@@ -19,7 +19,6 @@ import (
 	"github.com/kinkist/x-media-downloader/config"
 	"github.com/kinkist/x-media-downloader/db"
 	"github.com/kinkist/x-media-downloader/logger"
-	"github.com/kinkist/x-media-downloader/nsfw"
 	"github.com/kinkist/x-media-downloader/processor"
 	"github.com/kinkist/x-media-downloader/twitterscraper"
 )
@@ -62,24 +61,6 @@ func main() {
 			}
 		}
 
-		// ── 3. NSFW initialization (optional) ────────────────────
-		// Both OpenNSFW2 and NudeNet v2 can run simultaneously.
-		// Detection runs automatically after each media file is downloaded.
-		if cfg.Opennsfw2modelpath != "" {
-			if err := nsfw.Init(cfg.Opennsfw2modelpath, cfg.Onnxlibpath,
-				cfg.Opennsfw2inputname, cfg.Opennsfw2outputname); err != nil {
-				fmt.Fprintf(os.Stderr, "[WARN] OpenNSFW2 initialization failed, continuing without it: %v\n", err)
-			} else {
-				defer nsfw.Close()
-			}
-		}
-		if cfg.Nudenetv2modelpath != "" {
-			if err := nsfw.InitNudeNet(cfg.Nudenetv2modelpath, cfg.Onnxlibpath); err != nil {
-				fmt.Fprintf(os.Stderr, "[WARN] NudeNet v2 initialization failed, continuing without it: %v\n", err)
-			} else {
-				defer nsfw.CloseNudeNet()
-			}
-		}
 	} else {
 		fmt.Printf("[INFO] config load skipped (%v), using defaults\n", cfgErr)
 	}
@@ -123,8 +104,7 @@ func main() {
 	//   a. return immediately if no media (skip text-only tweets)
 	//   b. check DB for duplicate URL → skip if already tracked
 	//   c. download images/videos/GIFs
-	//   d. run NSFW detection and save {file}.nsfwvalue.txt (if enabled)
-	//   e. record downloaded URL in DB (if enabled)
+	//   d. record downloaded URL in DB (if enabled)
 	fmt.Printf("\n[PROCESSOR] processing tweet — ID=%s @%s\n", tweet.ID, tweet.Username)
 	fmt.Printf("  storage path: %s\n\n", dataDir)
 
